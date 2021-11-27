@@ -9,14 +9,9 @@ from strategies.baseStrategy import BaseStrategy
 
 class Cointegration(BaseStrategy):
     def __int__(self, dataLoader, symbols, timeframe, local, start, end,
-                change_of_close, long_mode, threshold, z_score_mean_window, z_score_std_window, debug_path='', debug_file='', debug=False):
-        super(Cointegration, self).__init__(symbols, dataLoader, long_mode, debug_path, debug_file, debug)
-        # data
-        self.symbols = symbols
-        self.timeframe = timeframe
-        self.local = local
-        self.start = start
-        self.end = end
+                change_of_close, long_mode, threshold, z_score_mean_window, z_score_std_window, percentage=0.8,
+                debug_path='', debug_file='', debug=False):
+        super(Cointegration, self).__init__(symbols, timeframe, start, end, dataLoader, debug_path, debug_file, debug, local, percentage, long_mode)
 
         # training
         self.change_of_close = change_of_close # False: using close price; True: using change of close price
@@ -94,6 +89,12 @@ class Cointegration(BaseStrategy):
         return equation
 
     def train(self):
+        dependent_variable = self.train_Prices.c
+        if self.change_of_close:
+            dependent_variable = self.train_Prices.cc
+        self.coefficient_vector = maths.run_regression_LA(input=dependent_variable.values[:, :-1], target=dependent_variable.values[:, -1])
+
+    def get_plt_datas(self):
         """
             :param Prices: collections.nametuple object
             :param threshold: np.float
@@ -101,61 +102,62 @@ class Cointegration(BaseStrategy):
             :param z_score_std_window: int
             :return: nested dictionary
             """
-        # -------------------------------------------------------------------- standard --------------------------------------------------------------------
-        Prices = self.dataLoader.get_data(self.symbols, self.q2d_exchg_symbols, self.b2d_exchg_symbols, self.timeframe, self.local, self.start, self.end)
-        # prepare signal
-        dependent_variable = Prices.c
-        if self.change_of_close:
-            dependent_variable = Prices.cc
-        self.coefficient_vector = maths.run_regression_LA(dependent_variable.values[:, :-1], dependent_variable.values[:, -1])
-        coin_data = self.get_coin_data(dependent_variable)  # get_coin_data() can work for coinNN and coin
-        signal = self.get_signal(coin_data, training=True)
-        # Get Graph Data
-        Graph_Data = self._get_graph_data(Prices, signal, self.coefficient_vector)
-
-        # -------------------------------------------------------------------- standard graph --------------------------------------------------------------------
         plt_datas = {}
-        # 1 graph: real and predict
-        real_predict_df = pd.concat([coin_data['real'], coin_data['predict']], axis=1)
-        adf_result_text = plotView.get_ADF_text_result(coin_data['spread'].values)
-        equation = self.get_coin_NN_equation_text(dependent_variable.columns, self.coefficient_vector)
-        plt_datas[0] = plotView._get_format_plot_data(df=real_predict_df, text=adf_result_text, equation=equation)
+        for key, Prices in {'train': self.train_Prices, 'test': self.test_Prices}.items():
+            # -------------------------------------------------------------------- standard --------------------------------------------------------------------
+            dependent_variable = Prices.c
+            if self.change_of_close:
+                dependent_variable = Prices.cc
+            # prepare signal
+            coin_data = self.get_coin_data(dependent_variable)  # get_coin_data() can work for coinNN and coin
+            signal = self.get_signal(coin_data, training=True)
+            # Get Graph Data
+            Graph_Data = self._get_graph_data(Prices, signal, self.coefficient_vector)
 
-        # 2 graph: spread
-        spread_df = pd.DataFrame(coin_data['spread'], index=dependent_variable.index)
-        plt_datas[1] = plotView._get_format_plot_data(df=spread_df)
+            # -------------------------------------------------------------------- standard graph --------------------------------------------------------------------
+            plt_datas[key] = {}
+            # 1 graph: real and predict
+            real_predict_df = pd.concat([coin_data['real'], coin_data['predict']], axis=1)
+            adf_result_text = plotView.get_ADF_text_result(coin_data['spread'].values)
+            equation = self.get_coin_NN_equation_text(dependent_variable.columns, self.coefficient_vector)
+            plt_datas[key][0] = plotView._get_format_plot_data(df=real_predict_df, text=adf_result_text, equation=equation)
 
-        # 3 graph: z-score
-        z_df = pd.DataFrame(coin_data['z_score'], index=dependent_variable.index)
-        plt_datas[2] = plotView._get_format_plot_data(df=z_df)
+            # 2 graph: spread
+            spread_df = pd.DataFrame(coin_data['spread'], index=dependent_variable.index)
+            plt_datas[key][1] = plotView._get_format_plot_data(df=spread_df)
 
-        # 4 graph: return
-        accum_ret_df = pd.DataFrame(index=dependent_variable.index)
-        accum_ret_df["accum_ret"] = Graph_Data.accum_ret
-        text = plotView.get_stat_text_condition(Graph_Data.stats, 'ret')
-        plt_datas[3] = plotView._get_format_plot_data(df=accum_ret_df, text=text)
+            # 3 graph: z-score
+            z_df = pd.DataFrame(coin_data['z_score'], index=dependent_variable.index)
+            plt_datas[key][2] = plotView._get_format_plot_data(df=z_df)
 
-        # 5 graph: earning
-        accum_earning_df = pd.DataFrame(index=dependent_variable.index)
-        accum_earning_df["accum_earning"] = Graph_Data.accum_earning
-        text = plotView.get_stat_text_condition(Graph_Data.stats, 'earning')
-        plt_datas[4] = plotView._get_format_plot_data(df=accum_earning_df, text=text)
+            # 4 graph: return
+            accum_ret_df = pd.DataFrame(index=dependent_variable.index)
+            accum_ret_df["accum_ret"] = Graph_Data.accum_ret
+            text = plotView.get_stat_text_condition(Graph_Data.stats, 'ret')
+            plt_datas[key][3] = plotView._get_format_plot_data(df=accum_ret_df, text=text)
 
-        # 6 graph: earning histogram
-        plt_datas[5] = plotView._get_format_plot_data(hist=pd.Series(Graph_Data.earning_list, name='earning'))
+            # 5 graph: earning
+            accum_earning_df = pd.DataFrame(index=dependent_variable.index)
+            accum_earning_df["accum_earning"] = Graph_Data.accum_earning
+            text = plotView.get_stat_text_condition(Graph_Data.stats, 'earning')
+            plt_datas[key][4] = plotView._get_format_plot_data(df=accum_earning_df, text=text)
 
-        # ------------ DEBUG -------------
-        df_debug = pd.DataFrame(index=Prices.c.index)
-        df_debug = pd.concat([df_debug, Prices.c, Graph_Data.modify_exchg_q2d, Prices.ptDv, coin_data,
-                              signal,
-                              Graph_Data.ret, accum_ret_df,
-                              Graph_Data.earning, accum_earning_df
-                              ], axis=1)
+            # 6 graph: earning histogram
+            plt_datas[key][5] = plotView._get_format_plot_data(hist=pd.Series(Graph_Data.earning_list, name='earning'))
 
-        if self.debug:
-            df_debug.to_csv(os.path.join(self.debug_path, self.debug_file))
+            # ------------ DEBUG -------------
+            df_debug = pd.DataFrame(index=Prices.c.index)
+            df_debug = pd.concat([df_debug, Prices.c, Graph_Data.modify_exchg_q2d, Prices.ptDv, coin_data,
+                                  signal,
+                                  Graph_Data.ret, accum_ret_df,
+                                  Graph_Data.earning, accum_earning_df
+                                  ], axis=1)
 
-        return plt_datas
+            if self.debug:
+                debug_file = "{}_{}".format(key, self.debug_file)
+                df_debug.to_csv(os.path.join(self.debug_path, debug_file))
+
+        return plt_datas['train'], plt_datas['test']
 
     def run(self, inputs):
         coin_data = self.get_coin_data(inputs)  # get_coin_data() can work for coinNN and coin

@@ -2,21 +2,16 @@ import numpy as np
 import pandas as pd
 
 from strategies.baseStrategy import BaseStrategy
-from models import signalModel, exchgModel
+from models import signalModel
 from views import plotView, printout
 from utils import tools
 import os
 
 class MovingAverage(BaseStrategy):
     def __init__(self, dataLoader, symbols, timeframe, local, start, end,
-                 fast_param, slow_param, limit_unit, max_index, long_mode, debug_path='', debug_file='', debug=False):
-        super(MovingAverage, self).__init__(symbols, dataLoader, long_mode, debug_path, debug_file, debug)
-        # data
-        self.symbols = symbols
-        self.timeframe = timeframe
-        self.local = local
-        self.start = start
-        self.end = end
+                 limit_unit, max_index, long_mode, fast_param=None, slow_param=None, percentage=0.8,
+                 debug_path='', debug_file='', debug=False):
+        super(MovingAverage, self).__init__(symbols, timeframe, start, end, dataLoader, debug_path, debug_file, debug, local, percentage, long_mode)
 
         # training
         self.fast_param = fast_param
@@ -24,6 +19,11 @@ class MovingAverage(BaseStrategy):
         self.limit_unit = limit_unit
         self.max_index = max_index
         self.long_mode = long_mode
+
+    def setup_model(self, fast_param, slow_param):
+        self.fast_param = fast_param
+        self.slow_param = slow_param
+        print("setup ok")
 
     def get_signal(self, ma_data, training=True):
         if self.long_mode:
@@ -61,19 +61,18 @@ class MovingAverage(BaseStrategy):
         ma_data['slow'] = self.get_moving_average(close_prices, slow)
         return ma_data
 
-    def loopOver(self):
+    def train(self):
         stat_csv_txt = ''
         stat = {}
-        Prices = self.dataLoader.get_data(self.symbols, self.q2d_exchg_symbols, self.b2d_exchg_symbols, self.timeframe, self.local, self.start, self.end)
         for slow_index in range(1, self.max_index):
             for fast_index in range(1, slow_index):
                 if slow_index == fast_index:
                     continue
                 # moving average object
-                ma_data = self.get_ma_data(Prices.c, fast_index, slow_index)
+                ma_data = self.get_ma_data(self.train_Prices.c, fast_index, slow_index)
                 signal, short_signal = self.get_signal(ma_data, training=True)
 
-                Graph_Data = self._get_graph_data(Prices, signal, coefficient_vector=np.array([]))
+                Graph_Data = self._get_graph_data(self.train_Prices, signal, coefficient_vector=np.array([]))
 
                 # stat
                 stat = Graph_Data.stat['earning'] # that is dictionary
@@ -88,50 +87,56 @@ class MovingAverage(BaseStrategy):
         stat_csv_txt = ','.join(list(stat.keys())) + '\n' + stat_csv_txt
         return stat_csv_txt
 
-    def train(self):
-        # prepare
-        Prices = self.dataLoader.get_data(self.symbols, self.q2d_exchg_symbols, self.b2d_exchg_symbols, self.timeframe, self.local, self.start, self.end)
-        ma_data = self.get_ma_data(Prices.c)
-        signal = self.get_signal(ma_data, training=True)
-        # Get Graph Data
-        Graph_Data = self._get_graph_data(Prices, signal, coefficient_vector=np.array([]))
+    def get_plt_datas(self):
+        if self.fast_param == None or self.slow_param == None:
+            print("The parameter have not set yet.\nType -setup to setup the parameter.")
+            return False
 
-        # -------------------------------------------------------------------- standard graph --------------------------------------------------------------------
         plt_datas = {}
-        # 1 graph: close price, fast ma,  slow ma
-        ma_df = pd.concat([Prices.c, ma_data['fast'], ma_data['slow']], axis=1)
-        if self.long_mode:
-            text = 'Long: \n  fast: {}\n  slow: {}'.format(self.fast_param, self.slow_param)
-        else:
-            text = 'short: \n  fast: {}\n  slow: {}'.format(self.fast_param, self.slow_param)
-        plt_datas[0] = plotView._get_format_plot_data(df=ma_df, text=text)
+        for key, Prices in {'train': self.train_Prices, 'test': self.test_Prices}.items():
+            # prepare
+            ma_data = self.get_ma_data(Prices.c)
+            signal = self.get_signal(ma_data, training=True)
+            # Get Graph Data
+            Graph_Data = self._get_graph_data(Prices, signal, coefficient_vector=np.array([]))
 
-        # 3 graph: ret
-        accum_ret_df = pd.DataFrame(index=Prices.c.index)
-        accum_ret_df["accum_ret"] = Graph_Data.accum_ret
-        text = plotView.get_stat_text_condition(Graph_Data.stats, 'ret')
-        plt_datas[1] = plotView._get_format_plot_data(df=accum_ret_df, text=text)
+            # -------------------------------------------------------------------- standard graph --------------------------------------------------------------------
+            plt_datas[key] = {}
+            # 1 graph: close price, fast ma,  slow ma
+            ma_df = pd.concat([Prices.c, ma_data['fast'], ma_data['slow']], axis=1)
+            if self.long_mode:
+                text = 'Long: \n  fast: {}\n  slow: {}'.format(self.fast_param, self.slow_param)
+            else:
+                text = 'short: \n  fast: {}\n  slow: {}'.format(self.fast_param, self.slow_param)
+            plt_datas[key][0] = plotView._get_format_plot_data(df=ma_df, text=text)
 
-        # 4 graph: earning
-        accum_earning_df = pd.DataFrame(index=Prices.c.index)
-        accum_earning_df["accum_earning"] = Graph_Data.accum_earning
-        text = plotView.get_stat_text_condition(Graph_Data.stats, 'earning')
-        plt_datas[2] = plotView._get_format_plot_data(df=accum_earning_df, text=text)
+            # 3 graph: ret
+            accum_ret_df = pd.DataFrame(index=Prices.c.index)
+            accum_ret_df["accum_ret"] = Graph_Data.accum_ret
+            text = plotView.get_stat_text_condition(Graph_Data.stats, 'ret')
+            plt_datas[key][1] = plotView._get_format_plot_data(df=accum_ret_df, text=text)
 
-        # 5 graph: ret histogram
-        plt_datas[3] = plotView._get_format_plot_data(hist=pd.Series(Graph_Data.ret_list, name='ret'))
+            # 4 graph: earning
+            accum_earning_df = pd.DataFrame(index=Prices.c.index)
+            accum_earning_df["accum_earning"] = Graph_Data.accum_earning
+            text = plotView.get_stat_text_condition(Graph_Data.stats, 'earning')
+            plt_datas[key][2] = plotView._get_format_plot_data(df=accum_earning_df, text=text)
 
-        # ------------ DEBUG -------------
-        df_debug = pd.DataFrame(index=Prices.o.index)
-        df_debug = pd.concat([df_debug, Prices.o, Graph_Data.modify_exchg_q2d, Prices.ptDv,
-                              ma_data,
-                              signal,
-                              Graph_Data.ret, accum_ret_df,
-                              Graph_Data.earning, accum_earning_df
-                              ], axis=1)
-        if self.debug:
-            df_debug.to_csv(os.path.join(self.debug_path, self.debug_file))
-        return plt_datas
+            # 5 graph: ret histogram
+            plt_datas[key][3] = plotView._get_format_plot_data(hist=pd.Series(Graph_Data.ret_list, name='ret'))
+
+            # ------------ DEBUG -------------
+            df_debug = pd.DataFrame(index=Prices.o.index)
+            df_debug = pd.concat([df_debug, Prices.o, Graph_Data.modify_exchg_q2d, Prices.ptDv,
+                                  ma_data,
+                                  signal,
+                                  Graph_Data.ret, accum_ret_df,
+                                  Graph_Data.earning, accum_earning_df
+                                  ], axis=1)
+            if self.debug:
+                debug_file = "{}_{}".format(key, self.debug_file)
+                df_debug.to_csv(os.path.join(self.debug_path, debug_file))
+        return plt_datas['train'], plt_datas['test']
 
     def run(self, inputs):
         ma_data = self.get_ma_data(inputs)

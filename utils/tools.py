@@ -74,3 +74,40 @@ def get_stats(long_ret_list, long_earning_list, short_ret_list, short_earning_li
     stats['short'] = get_stat(short_ret_list, short_earning_list)
     return stats
 
+def split_df(df, percentage):
+    split_index = int(len(df) * percentage)
+    upper_df = df.iloc[:split_index,:]
+    lower_df = df.iloc[split_index:, :]
+    return upper_df, lower_df
+
+def split_matrix(arr, percentage=0.8, axis=0):
+    """
+    :param arr: np.array() 2D
+    :param percentage: float
+    :param axis: float
+    :return: split array
+    """
+    cutOff = int(arr.shape[axis] * percentage)
+    max = arr.shape[axis]
+    I = [slice(None)] * arr.ndim
+    I[axis] = slice(0, cutOff)
+    upper_arr = arr[tuple(I)]
+    I[axis] = slice(cutOff, max)
+    lower_arr = arr[tuple(I)]
+    return upper_arr, lower_arr
+
+def append_dict_df(dict_df, mother_df, join='outer', filled=0):
+    """
+    :param mother_df: pd.DataFrame
+    :param join: 'inner', 'outer'
+    :param dict_df: {key: pd.DataFrame}
+    :return: pd.DataFrame after concat
+    """
+    if not isinstance(mother_df, pd.DataFrame):
+        mother_df = pd.DataFrame()
+    for df in dict_df.values(): # do not care the key name: tech name
+        if mother_df.empty:
+            mother_df = df.copy()
+        else:
+            mother_df = pd.concat([mother_df, df], axis=1, join=join)
+    return mother_df.fillna(filled)

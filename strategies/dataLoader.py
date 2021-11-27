@@ -3,6 +3,7 @@ import pandas as pd
 
 import config
 from models import mt5Model, exchgModel, fileModel, pointsModel
+from utils import tools
 
 class DataLoader: # created note 86a
     def __init__(self, data_path='', timezone='Hongkong', deposit_currency='USD'):
@@ -125,6 +126,33 @@ class DataLoader: # created note 86a
         df = df.resample(timeframe).apply(ohlc_rule)
         df.dropna(inplace=True)
         return df
+
+    def get_spreads(self, symbols, start, end):
+        """
+        :param symbols: [str]
+        :param start (local time): tuple (year, month, day, hour, mins) eg: (2010, 10, 30, 0, 0)
+        :param end (local time): tuple (year, month, day, hour, mins), if None, then take data until present
+        :return: pd.DataFrame
+        """
+        spreads = pd.DataFrame()
+        for symbol in symbols:
+            tick_frame = mt5Model.get_ticks_range(symbol, start, end, self.timezone)
+            spread = mt5Model.get_spread_from_ticks(tick_frame, symbol)
+            spreads = pd.concat([spreads, spread], axis=1, join='outer')
+        spreads.columns = symbols
+        return spreads
+
+    def split_Prices(self, Prices, percentage):
+        keys = list(Prices._asdict().keys())
+        prices = collections.namedtuple("prices", keys)
+        train_list, test_list = [], []
+        for df in Prices:
+            train, test = tools.split_df(df, percentage)
+            train_list.append(train)
+            test_list.append(test)
+        Train_Prices = prices._make(train_list)
+        Test_Prices = prices._make(test_list)
+        return Train_Prices, Test_Prices
 
     def get_Prices_format(self, symbols, q2d_exchg_symbols, b2d_exchg_symbols, prices):
         """

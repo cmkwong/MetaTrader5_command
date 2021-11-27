@@ -7,7 +7,7 @@ def check(input):
         print("Please select the strategy list")
         return config.COMMAND_CHECKED
 
-    if input == '-train':
+    if input == '-add':
         # input the start and end date
         #
         pass

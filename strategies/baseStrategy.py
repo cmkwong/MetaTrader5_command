@@ -3,8 +3,13 @@ from utils import tools
 import collections
 
 class BaseStrategy:
-    def __init__(self, symbols, dataLoader, debug_path, debug_file, debug, long_mode=None):
+    def __init__(self, symbols, timeframe, start, end, dataLoader, debug_path='', debug_file='', debug=False, local=False, percentage=0.8, long_mode=True):
+        # data
         self.symbols = symbols
+        self.timeframe = timeframe
+        self.local = local
+        self.start = start
+        self.end = end
         self.dataLoader = dataLoader
         self.long_mode = long_mode
 
@@ -14,6 +19,8 @@ class BaseStrategy:
         self.debug = debug  # Boolean, if True output the debug file
 
         # prepare
+        self.Prices = self.dataLoader.get_data(self.symbols, self.q2d_exchg_symbols, self.b2d_exchg_symbols, self.timeframe, self.local, self.start, self.end)
+        self.train_Prices, self.test_Prices = self.dataLoader.split_Prices(self.Prices, percentage)
         self.q2d_exchg_symbols = exchgModel.get_exchange_symbols(symbols, dataLoader.all_symbols_info, dataLoader.deposit_currency, 'q2d')
         self.b2d_exchg_symbols = exchgModel.get_exchange_symbols(symbols, dataLoader.all_symbols_info, dataLoader.deposit_currency, 'b2d')
 
