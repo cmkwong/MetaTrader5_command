@@ -5,34 +5,20 @@ import config
 from models import mt5Model, exchgModel, fileModel, pointsModel
 
 class DataLoader: # created note 86a
-    def __init__(self, symbols, timeframe, local=False, latest=False, data_path='', start=None, end=None, count=10, timezone='Hongkong', deposit_currency='USD'):
-        self.symbols = symbols
-        self.timeframe = timeframe
+    def __init__(self, data_path='', timezone='Hongkong', deposit_currency='USD'):
 
         # for local
-        self.local = local
         self.data_path = data_path # a symbol of data that stored in this directory
         self.data_time_difference_to_UTC = config.DOWNLOADED_MIN_DATA_TIME_BETWEEN_UTC
 
-        # property
-        self.Prices = {}
-        self.min_Prices = {}
-
         # for mt5
-        self.latest = latest  # getting the latest price
-        self.start = start
-        self.end = end
-        self.count = count
         self.timezone = timezone
         self.deposit_currency = deposit_currency
 
         # prepare
-        self.symbols_total = len(symbols)
-        self.all_symbols_info = mt5Model.get_all_symbols_info()
+        self.all_symbols_info = mt5Model.get_all_symbols_info() # get from broker
         self.Prices_Collection = collections.namedtuple("Prices_Collection", ['o','h','l','c', 'cc', 'ptDv','quote_exchg','base_exchg'])
         self.latest_Prices_Collection = collections.namedtuple("latest_Prices_Collection", ['c', 'cc', 'ptDv', 'quote_exchg']) # for latest Prices
-        self.q2d_exchg_symbols = exchgModel.get_exchange_symbols(symbols, self.all_symbols_info, self.deposit_currency, 'q2d')
-        self.b2d_exchg_symbols = exchgModel.get_exchange_symbols(symbols, self.all_symbols_info, self.deposit_currency, 'b2d')
         self._symbols_available = False # only for usage of _check_if_symbols_available()
 
     def _price_type_from_code(self, ohlc):
@@ -78,7 +64,7 @@ class DataLoader: # created note 86a
         required_prices.columns = required_symbols
         return required_prices
 
-    def _check_if_symbols_available(self, required_symbols):
+    def _check_if_symbols_available(self, required_symbols, local):
         """
         check if symbols exist, note 83h
         :param required_symbols: [str]
@@ -86,7 +72,7 @@ class DataLoader: # created note 86a
         """
         if not self._symbols_available:
             for symbol in required_symbols:
-                if not self.local:
+                if not local:
                     try:
                         _ = self.all_symbols_info[symbol]
                     except KeyError:
@@ -128,7 +114,7 @@ class DataLoader: # created note 86a
             raise Exception("The DataFrame columns is exceeding 4")
         return ohlc_rule
 
-    def _change_timeframe(self, df):
+    def _change_timeframe(self, df, timeframe):
         """
         note 84f
         :param df: pd.DataFrame, having header: open high low close
@@ -136,40 +122,40 @@ class DataLoader: # created note 86a
         :return:
         """
         ohlc_rule = self._get_ohlc_rule(df)
-        df = df.resample(self.timeframe).apply(ohlc_rule)
+        df = df.resample(timeframe).apply(ohlc_rule)
         df.dropna(inplace=True)
         return df
 
-    def get_Prices_format(self, prices):
+    def get_Prices_format(self, symbols, q2d_exchg_symbols, b2d_exchg_symbols, prices):
         """
         standard Prices format
         :param prices:
         :return:
         """
         # get open prices
-        open_prices = self._get_specific_from_prices(prices, self.symbols, ohlc='1000')
+        open_prices = self._get_specific_from_prices(prices, symbols, ohlc='1000')
 
         # get the change of close price
-        close_prices = self._get_specific_from_prices(prices, self.symbols, ohlc='0001')
+        close_prices = self._get_specific_from_prices(prices, symbols, ohlc='0001')
         changes = ((close_prices - close_prices.shift(1)) / close_prices.shift(1)).fillna(0.0)
 
         # get the change of high price
-        high_prices = self._get_specific_from_prices(prices, self.symbols, ohlc='0100')
+        high_prices = self._get_specific_from_prices(prices, symbols, ohlc='0100')
 
         # get the change of low price
-        low_prices = self._get_specific_from_prices(prices, self.symbols, ohlc='0010')
+        low_prices = self._get_specific_from_prices(prices, symbols, ohlc='0010')
 
         # get point diff values
-        # open_prices = _get_specific_from_prices(prices, self.symbols, ohlc='1000')
-        points_dff_values_df = pointsModel.get_points_dff_values_df(self.symbols, close_prices, close_prices.shift(periods=1), self.all_symbols_info)
+        # open_prices = _get_specific_from_prices(prices, symbols, ohlc='1000')
+        points_dff_values_df = pointsModel.get_points_dff_values_df(symbols, close_prices, close_prices.shift(periods=1), self.all_symbols_info)
 
         # get the quote to deposit exchange rate
-        exchg_close_prices = self._get_specific_from_prices(prices, self.q2d_exchg_symbols, ohlc='0001')
-        q2d_exchange_rate_df = exchgModel.get_exchange_df(self.symbols, self.q2d_exchg_symbols, exchg_close_prices, self.deposit_currency, "q2d")
+        exchg_close_prices = self._get_specific_from_prices(prices, q2d_exchg_symbols, ohlc='0001')
+        q2d_exchange_rate_df = exchgModel.get_exchange_df(symbols, q2d_exchg_symbols, exchg_close_prices, self.deposit_currency, "q2d")
 
         # get the base to deposit exchange rate
-        exchg_close_prices = self._get_specific_from_prices(prices, self.b2d_exchg_symbols, ohlc='0001')
-        b2d_exchange_rate_df = exchgModel.get_exchange_df(self.symbols, self.q2d_exchg_symbols, exchg_close_prices, self.deposit_currency, "b2d")
+        exchg_close_prices = self._get_specific_from_prices(prices, b2d_exchg_symbols, ohlc='0001')
+        b2d_exchange_rate_df = exchgModel.get_exchange_df(symbols, b2d_exchg_symbols, exchg_close_prices, self.deposit_currency, "b2d")
 
         # assign the column into each collection tuple
         Prices = self.Prices_Collection(o=open_prices,
@@ -183,12 +169,12 @@ class DataLoader: # created note 86a
 
         return Prices
 
-    def get_latest_Prices_format(self, prices):
+    def get_latest_Prices_format(self, symbols, q2d_exchg_symbols, prices, count):
         """
         this format as simple as possible
         """
-        close_prices = self._get_specific_from_prices(prices, self.symbols, ohlc='0001')
-        if len(close_prices) != self.count:  # note 63a
+        close_prices = self._get_specific_from_prices(prices, symbols, ohlc='0001')
+        if len(close_prices) != count:  # note 63a
             print("prices_df length of Data is not equal to count")
             return False
 
@@ -196,13 +182,13 @@ class DataLoader: # created note 86a
         change_close_prices = ((close_prices - close_prices.shift(1)) / close_prices.shift(1)).fillna(0.0)
 
         # get point diff values with latest value
-        points_dff_values_df = pointsModel.get_points_dff_values_df(self.symbols, close_prices, close_prices.shift(periods=1), self.all_symbols_info)
+        points_dff_values_df = pointsModel.get_points_dff_values_df(symbols, close_prices, close_prices.shift(periods=1), self.all_symbols_info)
 
         # get quote exchange with values
-        exchg_close_prices = self._get_specific_from_prices(prices, self.q2d_exchg_symbols, ohlc='0001')
-        q2d_exchange_rate_df = exchgModel.get_exchange_df(self.symbols, self.q2d_exchg_symbols, exchg_close_prices, self.deposit_currency, "q2d")
+        exchg_close_prices = self._get_specific_from_prices(prices, q2d_exchg_symbols, ohlc='0001')
+        q2d_exchange_rate_df = exchgModel.get_exchange_df(symbols, q2d_exchg_symbols, exchg_close_prices, self.deposit_currency, "q2d")
         # if len(q2d_exchange_rate_df_o) or len(q2d_exchange_rate_df_c) == 39, return false and run again
-        if len(q2d_exchange_rate_df) != self.count:  # note 63a
+        if len(q2d_exchange_rate_df) != count:  # note 63a
             print("q2d_exchange_rate_df_o or q2d_exchange_rate_df_c length of Data is not equal to count")
             return False
 
@@ -213,7 +199,7 @@ class DataLoader: # created note 86a
 
         return Prices
 
-    def _get_mt5_prices(self, required_symbols, ohlc='1111'):
+    def _get_mt5_prices(self, required_symbols, timeframe, start, end, latest, count, ohlc='1111'):
         """
         :param required_symbols: [str]
         :param timeframe: str, '1H'
@@ -228,11 +214,11 @@ class DataLoader: # created note 86a
         required_types = self._price_type_from_code(ohlc)
         prices_df = None
         for i, symbol in enumerate(required_symbols):
-            if self.latest:  # get the latest units of data
-                price = mt5Model.get_current_bars(symbol, self.timeframe, self.count).loc[:, required_types]
+            if latest:  # get the latest units of data
+                price = mt5Model.get_current_bars(symbol, timeframe, count).loc[:, required_types]
                 join = 'inner'  # if getting count, need to join=inner to check if data getting completed
-            elif not self.latest and self.start != None:  # get data from start to end
-                price = mt5Model.get_historical_data(symbol, self.timeframe, self.timezone, self.start, self.end).loc[:, required_types]
+            elif not latest and start != None:  # get data from start to end
+                price = mt5Model.get_historical_data(symbol, timeframe, self.timezone, start, end).loc[:, required_types]
             else:
                 raise Exception('start-date must be set when end-date is being set.')
             if i == 0:
@@ -276,23 +262,24 @@ class DataLoader: # created note 86a
 
         return prices
 
-    def get_data(self):
+    def get_data(self, symbols, q2d_exchg_symbols, b2d_exchg_symbols, timeframe, local, start, end, latest=False, count=40):
         # read data in dictionary format
         prices, min_prices = {}, {}
-        required_symbols = list(set(self.symbols + self.q2d_exchg_symbols + self.b2d_exchg_symbols))
-        self._check_if_symbols_available(required_symbols) # if not, raise Exception
+        required_symbols = list(set(symbols + q2d_exchg_symbols + b2d_exchg_symbols))
+        self._check_if_symbols_available(required_symbols, local) # if not, raise Exception
         # get data from local / mt5
-        if self.local:
+        if local:
             min_prices = self._get_local_prices(required_symbols, self.data_time_difference_to_UTC, '1111')
             # change the timeframe if needed
-            if self.timeframe != '1min':  # 1 minute data should not modify, saving the computation cost
+            if timeframe != '1min':  # 1 minute data should not modify, saving the computation cost
                 for symbol in required_symbols:
-                    prices[symbol] = self._change_timeframe(min_prices[symbol])
-            self.min_Prices = self.get_Prices_format(min_prices)
+                    prices[symbol] = self._change_timeframe(min_prices[symbol], timeframe)
+            # self.min_Prices = self.get_Prices_format(symbols, q2d_exchg_symbols, b2d_exchg_symbols, min_prices)
         else:
-            prices = self._get_mt5_prices(required_symbols, '1111')
+            prices = self._get_mt5_prices(required_symbols, timeframe, start, end, latest, count, '1111')
         # format the Prices depend on latest or not
-        if not self.latest:
-            self.Prices = self.get_Prices_format(prices) # completed format
+        if not latest:
+            Prices = self.get_Prices_format(symbols, q2d_exchg_symbols, b2d_exchg_symbols, prices) # completed format
         else:
-            self.Prices = self.get_latest_Prices_format(prices) # faster and simple format
+            Prices = self.get_latest_Prices_format(symbols, q2d_exchg_symbols, prices, count) # faster and simple format
+        return Prices
