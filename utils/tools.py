@@ -17,10 +17,16 @@ def get_accuracy(values, th=0.0):
     accuracy = np.sum([c > th for c in values]) / len(values)
     return accuracy
 
-def append_dict_into_text(stat, txt=''):
-    values = list(stat.values())
+def append_dictValues_into_text(dic, txt=''):
+    values = list(dic.values())
     txt += ','.join([str(value) for value in values]) + '\n'
     return txt
+
+def dic_into_text(dic):
+    text = ''
+    for k, v in dic.items():
+        text += "{}: {}\n".format(str(k), str(v))
+    return text
 
 def find_required_path(path, target):
     while(True):

@@ -1,7 +1,8 @@
-import config
-from datetime import datetime, timedelta
 import MetaTrader5 as mt5
 import pytz
+
+import config
+from datetime import datetime, timedelta
 
 def get_txt2timeframe(timeframe_txt):
     timeframe_dicts = {"1min": mt5.TIMEFRAME_M1, "2min": mt5.TIMEFRAME_M2, "3min": mt5.TIMEFRAME_M3, "4min": mt5.TIMEFRAME_M4,
@@ -28,10 +29,17 @@ def get_timeframe2txt(mt5_timeframe_txt):
 def get_utc_time_from_broker(time, timezone):
     """
     :param time: tuple (year, month, day, hour, mins) eg: (2010, 10, 30, 0, 0)
+    :param time: str '2110300000'
     :param timezone: Check: set(pytz.all_timezones_set) - (Etc/UTC)
     :return: datetime format
     """
-    dt = datetime(time[0], time[1], time[2], hour=time[3], minute=time[4]) + timedelta(hours=config.BROKER_TIME_BETWEEN_UTC, minutes=0)
+    if isinstance(time, (tuple, list)):
+        dt = datetime(time[0], time[1], time[2], hour=time[3], minute=time[4])
+    elif isinstance(time, str) and len(time) == 10:
+        dt = datetime(int('20' + time[0:2]), int(time[2:4]), int(time[4:6]), hour=int(time[6:8]), minute=int(time[8:10]))
+    else:
+        raise Exception("Not correct type for time")
+    dt = dt + timedelta(hours=config.BROKER_TIME_BETWEEN_UTC, minutes=0)
     utc_time = pytz.timezone(timezone).localize(dt)
     return utc_time
 
@@ -46,12 +54,15 @@ def get_current_utc_time_from_broker(timezone):
     utc_time = pytz.timezone(timezone).localize(dt)
     return utc_time
 
-def get_time_string(tt):
+def get_time_string(time):
     """
-    :param tt: time_tuple: tuple (yyyy,m,d,h,m)
-    :return: string
+    :param time: time_tuple: tuple (yyyy,m,d,h,m): (2021, 10, 30, 0, 0)
+    :return: string: '2110300000'
     """
-    time_string = str(tt[0]) + '-' + str(tt[1]).zfill(2) + '-' + str(tt[2]).zfill(2) + '-' + str(tt[3]).zfill(2) + '-' + str(tt[4]).zfill(2)
+    if isinstance(time, (tuple, list)):
+        time_string = str(time[0]) + '-' + str(time[1]).zfill(2) + '-' + str(time[2]).zfill(2) + '-' + str(time[3]).zfill(2) + '-' + str(time[4]).zfill(2)
+    else:
+        raise Exception("Not correct type for time")
     return time_string
 
 def get_current_time_string():

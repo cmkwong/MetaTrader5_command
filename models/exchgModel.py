@@ -1,4 +1,4 @@
-import signalModel
+from models import signalModel
 import pandas as pd
 from datetime import timedelta
 

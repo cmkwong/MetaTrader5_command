@@ -59,23 +59,6 @@ def read_symbol_price(data_path, symbol, data_time_difference_to_UTC, ohlc='1001
     symbol_prices = symbol_prices[~symbol_prices.index.duplicated(keep='first')]  # note 80b and note 81c
     return symbol_prices
 
-def get_file_list(files_path, reverse=False):
-    """
-    :param files_path: str, data_path + symbol
-    :param symbol: str
-    :return: list
-    """
-    list_dir = os.listdir(files_path)
-    list_dir = sorted(list_dir, reverse=reverse)
-    return list_dir
-
-def clear_files(main_path):
-    # clear before write
-    for file in get_file_list(main_path):
-        remove_full_path = os.path.join(main_path, file)
-        os.remove(remove_full_path)
-        print("The file {} has been removed.".format(file))
-
 def write_min_extra_info(main_path, file_name, symbols, long_signal, short_signal, long_modify_exchg_q2d, short_modify_exchg_q2d):
     """
     :param main_path: str
@@ -139,5 +122,30 @@ def transfer_all_xlsx_to_csv(main_path):
         df.to_csv(csv_full_path, encoding='utf-8', index=False, header=False)
 
     return True
-# main_path = 'C:\\Users\\Chris\\projects\\210215_mt5\\production\\docs\\1\\min_data\\GBPUSD'
-# transfer_all_xlsx_to_csv(main_path)
+
+def get_file_list(files_path, reverse=False):
+    """
+    :param files_path: str, data_path + symbol
+    :param symbol: str
+    :return: list
+    """
+    list_dir = os.listdir(files_path)
+    list_dir = sorted(list_dir, reverse=reverse)
+    return list_dir
+
+def clear_files(main_path):
+    # clear before write
+    for file in get_file_list(main_path):
+        remove_full_path = os.path.join(main_path, file)
+        os.remove(remove_full_path)
+        print("The file {} has been removed.".format(file))
+
+def create_dir(main_path, dir_name, readme=None):
+    """
+    Create directory with readme.txt
+    """
+    path = os.path.join(main_path, dir_name)
+    os.mkdir(path)
+    if readme:
+        with open(os.path.join(path, 'readme.txt'), 'a') as f:
+            f.write(readme)

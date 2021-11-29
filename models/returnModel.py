@@ -1,8 +1,8 @@
-import pointsModel
-import signalModel
 from datetime import timedelta
 import pandas as pd
 import numpy as np
+
+from models import pointsModel, signalModel
 
 def get_modified_coefficient_vector(coefficient_vector, long_mode, lot_times=1):
     """

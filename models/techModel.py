@@ -154,3 +154,4 @@ def get_tech_datas(Prices, params, tech_name):
         elif tech_name == 'macd':
             datas[param] = get_macd(Prices.c, *param)
     return datas
+

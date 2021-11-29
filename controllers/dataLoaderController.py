@@ -16,6 +16,7 @@ class DataLoader: # created note 86a
         self.timezone = timezone
         self.deposit_currency = deposit_currency
 
+    def prepare(self):
         # prepare
         self.all_symbols_info = mt5Model.get_all_symbols_info() # get from broker
         self.Prices_Collection = collections.namedtuple("Prices_Collection", ['o','h','l','c', 'cc', 'ptDv','quote_exchg','base_exchg'])
