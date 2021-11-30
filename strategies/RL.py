@@ -8,8 +8,9 @@ from strategies.baseStrategy import BaseStrategy
 from models.RLModel import actionsModel, agentModel, NNModel, experienceModel, environModel, validationModel, common
 
 class SimpleRL(BaseStrategy):
-    def __int__(self, dataLoader, symbols, timeframe, local, start, end,
-                tech_params, RL_options, long_mode, percentage=0.8,
+    def __int__(self, dataLoader, *,
+                symbols, timeframe, local, start, end, tech_params, RL_options, long_mode,
+                percentage=0.8,
                 net_saved_path='', net_file = '',
                 debug_path='', debug_file='', debug=False):
         super(SimpleRL, self).__init__(symbols, timeframe, start, end, dataLoader, debug_path, debug_file, debug, local, percentage, long_mode)
@@ -24,8 +25,8 @@ class SimpleRL(BaseStrategy):
         self.net_file = net_file
 
         # build the env (long)
-        self.env = environModel.TechicalForexEnv(symbols, self.train_Prices, tech_params, True, dataLoader.all_symbols_info, 0.05, 8, 15, 1, random_ofs_on_reset=True, reset_on_close=True)
-        self.env_val = environModel.TechicalForexEnv(symbols, self.test_Prices, tech_params, True, dataLoader.all_symbols_info, 0.05, 8, 15, 1, random_ofs_on_reset=False, reset_on_close=False)
+        self.env = environModel.TechicalForexEnv(symbols, self.train_Prices, tech_params, True, dataLoader.mt5Controller.all_symbols_info, 0.05, 8, 15, 1, random_ofs_on_reset=True, reset_on_close=True)
+        self.env_val = environModel.TechicalForexEnv(symbols, self.test_Prices, tech_params, True, dataLoader.mt5Controller.all_symbols_info, 0.05, 8, 15, 1, random_ofs_on_reset=False, reset_on_close=False)
 
         self.net = NNModel.SimpleFFDQN(self.env.get_obs_len(), self.env.get_action_space_size())
 

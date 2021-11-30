@@ -22,8 +22,8 @@ class BaseStrategy:
         self.debug = debug  # Boolean, if True output the debug file
 
         # prepare
-        self.q2d_exchg_symbols = exchgModel.get_exchange_symbols(symbols, dataLoader.all_symbols_info, dataLoader.deposit_currency, 'q2d')
-        self.b2d_exchg_symbols = exchgModel.get_exchange_symbols(symbols, dataLoader.all_symbols_info, dataLoader.deposit_currency, 'b2d')
+        self.q2d_exchg_symbols = exchgModel.get_exchange_symbols(symbols, dataLoader.mt5Controller.all_symbols_info, dataLoader.deposit_currency, 'q2d')
+        self.b2d_exchg_symbols = exchgModel.get_exchange_symbols(symbols, dataLoader.mt5Controller.all_symbols_info, dataLoader.deposit_currency, 'b2d')
         self.Prices = dataLoader.get_data(self.symbols, self.q2d_exchg_symbols, self.b2d_exchg_symbols, self.timeframe, self.local, self.start, self.end)
         self.train_Prices, self.test_Prices = dataLoader.split_Prices(self.Prices, percentage)
 

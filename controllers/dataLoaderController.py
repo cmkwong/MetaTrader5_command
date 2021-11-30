@@ -1,24 +1,24 @@
 import collections
+from datetime import datetime
 import pandas as pd
 
 import config
-from models import mt5Model, exchgModel, fileModel, pointsModel
+from models import exchgModel, fileModel, pointsModel, timeModel
 from utils import tools
 
 class DataLoader: # created note 86a
-    def __init__(self, data_path='', timezone='Hongkong', deposit_currency='USD'):
+    def __init__(self, mt5Controller, local_data_path='', deposit_currency='USD'):
 
         # for local
-        self.data_path = data_path # a symbol of data that stored in this directory
+        self.local_data_path = local_data_path # a symbol of data that stored in this directory
+        self.deposit_currency = deposit_currency
         self.data_time_difference_to_UTC = config.DOWNLOADED_MIN_DATA_TIME_BETWEEN_UTC
 
         # for mt5
-        self.timezone = timezone
-        self.deposit_currency = deposit_currency
+        self.mt5Controller = mt5Controller
 
     def prepare(self):
         # prepare
-        self.all_symbols_info = mt5Model.get_all_symbols_info() # get from broker
         self.Prices_Collection = collections.namedtuple("Prices_Collection", ['o','h','l','c', 'cc', 'ptDv','quote_exchg','base_exchg'])
         self.latest_Prices_Collection = collections.namedtuple("latest_Prices_Collection", ['c', 'cc', 'ptDv', 'quote_exchg']) # for latest Prices
         self._symbols_available = False # only for usage of _check_if_symbols_available()
@@ -76,13 +76,13 @@ class DataLoader: # created note 86a
             for symbol in required_symbols:
                 if not local:
                     try:
-                        _ = self.all_symbols_info[symbol]
+                        _ = self.mt5Controller.all_symbols_info[symbol]
                     except KeyError:
                         raise Exception("The {} is not provided in this broker.".format(symbol))
                 else:
-                    fs = fileModel.get_file_list(self.data_path)
+                    fs = fileModel.get_file_list(self.local_data_path)
                     if symbol not in fs:
-                        raise Exception("The {} is not provided in my {}.".format(symbol, self.data_path))
+                        raise Exception("The {} is not provided in my {}.".format(symbol, self.local_data_path))
             self._symbols_available = True
 
     def _get_ohlc_rule(self, df):
@@ -128,6 +128,31 @@ class DataLoader: # created note 86a
         df.dropna(inplace=True)
         return df
 
+    def get_ticks_range(self, symbol, start, end):
+        """
+        :param symbol: str, symbol
+        :param start: tuple, (2019,1,1)
+        :param end: tuple, (2020,1,1)
+        :param count:
+        :return:
+        """
+        utc_from = timeModel.get_utc_time_from_broker(start, self.mt5Controller.timezone)
+        utc_to = timeModel.get_utc_time_from_broker(end, self.mt5Controller.timezone)
+        ticks = self.mt5Controller.get_ticks(symbol, utc_from, utc_to)
+        ticks_frame = pd.DataFrame(ticks)  # set to dataframe, several name of cols like, bid, ask, volume...
+        ticks_frame['time'] = pd.to_datetime(ticks_frame['time'], unit='s')  # transfer numeric time into second
+        ticks_frame = ticks_frame.set_index('time')  # set the index
+        return ticks_frame
+
+    def get_spread_from_ticks(self, ticks_frame, symbol):
+        """
+        :param ticks_frame: pd.DataFrame, all tick info
+        :return: pd.Series
+        """
+        spread = pd.Series((ticks_frame['ask'] - ticks_frame['bid']) * (10 ** self.mt5Controller.get_symbol_info(symbol).digits), index=ticks_frame.index, name='ask_bid_spread_pt')
+        spread = spread.groupby(spread.index).mean()  # groupby() note 56b
+        return spread
+
     def get_spreads(self, symbols, start, end):
         """
         :param symbols: [str]
@@ -137,8 +162,8 @@ class DataLoader: # created note 86a
         """
         spreads = pd.DataFrame()
         for symbol in symbols:
-            tick_frame = mt5Model.get_ticks_range(symbol, start, end, self.timezone)
-            spread = mt5Model.get_spread_from_ticks(tick_frame, symbol)
+            tick_frame = self.get_ticks_range(symbol, start, end)
+            spread = self.get_spread_from_ticks(tick_frame, symbol)
             spreads = pd.concat([spreads, spread], axis=1, join='outer')
         spreads.columns = symbols
         return spreads
@@ -176,7 +201,7 @@ class DataLoader: # created note 86a
 
         # get point diff values
         # open_prices = _get_specific_from_prices(prices, symbols, ohlc='1000')
-        points_dff_values_df = pointsModel.get_points_dff_values_df(symbols, close_prices, close_prices.shift(periods=1), self.all_symbols_info)
+        points_dff_values_df = pointsModel.get_points_dff_values_df(symbols, close_prices, close_prices.shift(periods=1), self.mt5Controller.all_symbols_info)
 
         # get the quote to deposit exchange rate
         exchg_close_prices = self._get_specific_from_prices(prices, q2d_exchg_symbols, ohlc='0001')
@@ -211,7 +236,7 @@ class DataLoader: # created note 86a
         change_close_prices = ((close_prices - close_prices.shift(1)) / close_prices.shift(1)).fillna(0.0)
 
         # get point diff values with latest value
-        points_dff_values_df = pointsModel.get_points_dff_values_df(symbols, close_prices, close_prices.shift(periods=1), self.all_symbols_info)
+        points_dff_values_df = pointsModel.get_points_dff_values_df(symbols, close_prices, close_prices.shift(periods=1), self.mt5Controller.all_symbols_info)
 
         # get quote exchange with values
         exchg_close_prices = self._get_specific_from_prices(prices, q2d_exchg_symbols, ohlc='0001')
@@ -228,7 +253,43 @@ class DataLoader: # created note 86a
 
         return Prices
 
-    def _get_mt5_prices(self, required_symbols, timeframe, start, end, latest, count, ohlc='1111'):
+    def get_historical_data(self, symbol, timeframe, start, end=None):
+        """
+        :param symbol: str
+        :param timeframe: str, '1H'
+        :param start (local time): tuple (year, month, day, hour, mins) eg: (2010, 10, 30, 0, 0)
+        :param end (local time): tuple (year, month, day, hour, mins), if None, then take data until present
+        :return: dataframe
+        """
+        timeframe = timeModel.get_txt2timeframe(timeframe)
+        utc_from = timeModel.get_utc_time_from_broker(start, self.mt5Controller.timezone)
+        if end == None:  # if end is None, get the data at current time
+            now = datetime.today()
+            now_tuple = (now.year, now.month, now.day, now.hour, now.minute)
+            utc_to = timeModel.get_utc_time_from_broker(now_tuple, self.mt5Controller.timezone)
+        else:
+            utc_to = timeModel.get_utc_time_from_broker(end, self.mt5Controller.timezone)
+        rates = self.mt5Controller.get_data(symbol, timeframe, utc_from, utc_to)
+        rates_frame = pd.DataFrame(rates, dtype=float)  # create DataFrame out of the obtained data
+        rates_frame['time'] = pd.to_datetime(rates_frame['time'], unit='s')  # convert time in seconds into the datetime format
+        rates_frame = rates_frame.set_index('time')
+        return rates_frame
+
+    def get_current_bars(self, symbol, timeframe, count):
+        """
+        :param symbols: str
+        :param timeframe: str, '1H'
+        :param count: int
+        :return: df
+        """
+        timeframe = timeModel.get_txt2timeframe(timeframe)
+        rates = self.mt5Controller.get_data_from_pos(symbol, timeframe, 0, count)  # 0 means the current bar
+        rates_frame = pd.DataFrame(rates, dtype=float)
+        rates_frame['time'] = pd.to_datetime(rates_frame['time'], unit='s')
+        rates_frame = rates_frame.set_index('time')
+        return rates_frame
+
+    def get_mt5_prices(self, required_symbols, timeframe, start, end, latest, count, ohlc='1111'):
         """
         :param required_symbols: [str]
         :param timeframe: str, '1H'
@@ -244,10 +305,10 @@ class DataLoader: # created note 86a
         prices_df = None
         for i, symbol in enumerate(required_symbols):
             if latest:  # get the latest units of data
-                price = mt5Model.get_current_bars(symbol, timeframe, count).loc[:, required_types]
+                price = self.get_current_bars(symbol, timeframe, count).loc[:, required_types]
                 join = 'inner'  # if getting count, need to join=inner to check if data getting completed
             elif not latest and start != None:  # get data from start to end
-                price = mt5Model.get_historical_data(symbol, timeframe, self.timezone, start, end).loc[:, required_types]
+                price = self.get_historical_data(symbol, timeframe, start, end).loc[:, required_types]
             else:
                 raise Exception('start-date must be set when end-date is being set.')
             if i == 0:
@@ -264,7 +325,7 @@ class DataLoader: # created note 86a
 
         return prices
 
-    def _get_local_prices(self, required_symbols, data_time_difference_to_UTC, ohlc):
+    def get_local_prices(self, required_symbols, data_time_difference_to_UTC, ohlc):
         """
         :param required_symbols: [str]
         :param data_time_difference_to_UTC: int
@@ -275,7 +336,7 @@ class DataLoader: # created note 86a
         prices_df = pd.DataFrame()
         for i, symbol in enumerate(required_symbols):
             print("Processing: {}".format(symbol))
-            price_df = fileModel.read_symbol_price(self.data_path, symbol, data_time_difference_to_UTC, ohlc=ohlc)
+            price_df = fileModel.read_symbol_price(self.local_data_path, symbol, data_time_difference_to_UTC, ohlc=ohlc)
             if i == 0:
                 prices_df = price_df.copy()
             else:
@@ -298,14 +359,14 @@ class DataLoader: # created note 86a
         self._check_if_symbols_available(required_symbols, local) # if not, raise Exception
         # get data from local / mt5
         if local:
-            min_prices = self._get_local_prices(required_symbols, self.data_time_difference_to_UTC, '1111')
+            min_prices = self.get_local_prices(required_symbols, self.data_time_difference_to_UTC, '1111')
             # change the timeframe if needed
             if timeframe != '1min':  # 1 minute data should not modify, saving the computation cost
                 for symbol in required_symbols:
                     prices[symbol] = self._change_timeframe(min_prices[symbol], timeframe)
             # self.min_Prices = self.get_Prices_format(symbols, q2d_exchg_symbols, b2d_exchg_symbols, min_prices)
         else:
-            prices = self._get_mt5_prices(required_symbols, timeframe, start, end, latest, count, '1111')
+            prices = self.get_mt5_prices(required_symbols, timeframe, start, end, latest, count, '1111')
         # format the Prices depend on latest or not
         if not latest:
             Prices = self.get_Prices_format(symbols, q2d_exchg_symbols, b2d_exchg_symbols, prices) # completed format
