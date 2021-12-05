@@ -5,10 +5,11 @@ from models import signalModel
 from views import plotView
 from utils import maths
 from strategies.baseStrategy import BaseStrategy
+from models.paramModel import SymbolList, InputBoolean
 
 class Cointegration(BaseStrategy):
     def __init__(self, dataLoader, *,
-                symbols:list, timeframe:str, local:bool, start:str, end:str, change_of_close:bool, threshold:float, z_score_mean_window:int, z_score_std_window:int, long_mode:bool,
+                symbols:SymbolList, timeframe:str, local:InputBoolean, start:str, end:str, change_of_close:bool, threshold:float, z_score_mean_window:int, z_score_std_window:int, long_mode:InputBoolean,
                 percentage=0.8, debug_path='', debug_file='', debug=False):
         super(Cointegration, self).__init__(symbols, timeframe, start, end, dataLoader, debug_path, debug_file, debug, local, percentage, long_mode)
 

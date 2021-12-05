@@ -6,17 +6,16 @@ from utils import tools
 
 class Trader:
     def __init__(self, deposit_currency, timezone, local_data_path, docs_path):
+
         # init
         self.mt5Controller = Mt5Controller(timezone)
         self.executor = Executor()
         self.dataLoader = DataLoader(self.mt5Controller, local_data_path, deposit_currency)
+        self.dataLoader.prepare()
 
+        # prepare
         self.docs_path = docs_path
         self.strategies = {}
-
-        # connect mt5
-        self.mt5Controller.connect_server()
-        self.dataLoader.prepare()
 
     def end(self):
         self.mt5Controller.disconnect_server()

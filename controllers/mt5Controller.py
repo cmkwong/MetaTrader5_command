@@ -7,6 +7,7 @@ class Mt5Controller:
         """
         :param timezone: Check: set(pytz.all_timezones_set) - (Etc/UTC)
         """
+        self.connect_server()
         self.timezone = timezone
         self.all_symbols_info = self.get_all_symbols_info() # get from broker
 
