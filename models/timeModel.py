@@ -60,12 +60,17 @@ def get_time_string(time):
     :return: string: '2110300000'
     """
     if isinstance(time, (tuple, list)):
-        time_string = str(time[0]) + '-' + str(time[1]).zfill(2) + '-' + str(time[2]).zfill(2) + '-' + str(time[3]).zfill(2) + '-' + str(time[4]).zfill(2)
+        time_string = ''
+        for slot in time:
+            time_string += str(slot).zfill(2) + '-'
     else:
         raise Exception("Not correct type for time")
-    return time_string
+    return time_string[:-1]
 
-def get_current_time_string():
+def get_current_time_string(with_seconds=False):
     now = datetime.today()
-    end_str = get_time_string((now.year, now.month, now.day, now.hour, now.minute))
+    if not with_seconds:
+        end_str = get_time_string((now.year, now.month, now.day, now.hour, now.minute))
+    else:
+        end_str = get_time_string((now.year, now.month, now.day, now.hour, now.minute, now.second))
     return end_str

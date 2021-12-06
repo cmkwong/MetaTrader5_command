@@ -8,11 +8,10 @@ from utils import tools
 from models.paramModel import SymbolList, InputBoolean
 
 class MovingAverage(BaseStrategy):
-    def __init__(self, dataLoader, *,
+    def __init__(self, dataLoader, strategy_id, *,
                  symbols:SymbolList, timeframe:str, local:InputBoolean, start:str, end:str, limit_unit:int, max_index:int, long_mode:InputBoolean,
-                 fast_param=None, slow_param=None, percentage=0.8,
-                 debug_path='', debug_file='', debug=False):
-        super(MovingAverage, self).__init__(symbols, timeframe, start, end, dataLoader, debug_path, debug_file, debug, local, percentage, long_mode)
+                 fast_param=None, slow_param=None, percentage=0.8, debug=False):
+        super(MovingAverage, self).__init__(strategy_id, symbols, timeframe, start, end, dataLoader, debug, local, percentage, long_mode)
 
         # training
         self.fast_param = fast_param
@@ -113,7 +112,7 @@ class MovingAverage(BaseStrategy):
 
             # ------------ DEBUG -------------
             if self.debug:
-                self.get_debug(Prices, Graph_Data, ma_data, signal, accum_ret_df, accum_earning_df, train_test)
+                self.get_numeric_debug(Prices, Graph_Data, ma_data, signal, accum_ret_df, accum_earning_df, train_test)
 
         return plt_datas['train'], plt_datas['test']
 

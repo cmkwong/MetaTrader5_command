@@ -27,9 +27,11 @@ class Trader:
 
     def add_strategy(self, strategyClass, params):
         # build the strategy file
-        time_str = timeModel.get_current_time_string()
+        time_str = timeModel.get_current_time_string(with_seconds=True)
+        strategy_id = "{}_{}".format(time_str, strategyClass.__name__)
         text = "Strategy: {}\n{}".format(strategyClass.__name__, tools.dic_into_text(params))
-        fileModel.create_dir(self.docs_path, time_str, text)
-        # add the strategy with naming
-        self.strategies["{}_{}".format(time_str, strategyClass.__name__)] = strategyClass(self.dataLoader, **params)
+        fileModel.create_dir(self.docs_path, strategy_id, text)
+        # create strategy class and add into Trader
+        self.strategies[strategy_id] = strategyClass(self.dataLoader, strategy_id, **params)
+        print("{} added".format(strategy_id))
 

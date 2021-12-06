@@ -5,18 +5,19 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
 from strategies.baseStrategy import BaseStrategy
+from strategies.nnStrategy import NNStrategy
 from models.RLModel import actionsModel, agentModel, NNModel, experienceModel, environModel, validationModel, common
 from models.paramModel import SymbolList, Tech_Dict, InputBoolean
 
-class SimpleRL(BaseStrategy):
-    def __init__(self, dataLoader, *,
+class SimpleRL(BaseStrategy, NNStrategy):
+    def __init__(self, dataLoader, strategy_id, *,
                  symbols:SymbolList, timeframe:str, local:InputBoolean, start:str, end:str, tech_params:Tech_Dict, lr:float, batch_size:int, epsilon_start:float, epsilon_end:float,
                  gamma:float, reward_steps:int, replay_size:int, monitor_buffer_size:int, replay_start:int, epsilon_step:int, target_net_sync:int, validation_step:int,
                  checkpoint_step:int, weight_visualize_step:int, buffer_monitor_step:int, validation_episodes:int, long_mode:InputBoolean,
                  percentage=0.8,
-                 net_saved_path='', net_file = '',
-                 debug_path='', debug_file='', debug=False):
-        super(SimpleRL, self).__init__(symbols, timeframe, start, end, dataLoader, debug_path, debug_file, debug, local, percentage, long_mode)
+                 net_saved_path='', net_file = '', debug=False):
+        BaseStrategy.__init__(self, strategy_id, symbols, timeframe, start, end, dataLoader, debug, local, percentage, long_mode)
+        NNStrategy.__init__(self, strategy_id)
 
         # training
         self.step_idx = 0
@@ -61,13 +62,13 @@ class SimpleRL(BaseStrategy):
         self.net_processor = common.netPreprocessor(self.net, self.agent.target_model)
 
         # validator
-        self.validator = validationModel.validator(self.env_val, self.net, save_path=RL_options['val_save_path'], comission=0.1)
+        self.validator = validationModel.validator(self.env_val, self.net, save_path=self.test_save_path, comission=0.1)
 
         # create the monitor
-        self.monitor = common.monitor(self.buffer, RL_options['buffer_save_path'])
+        self.monitor = common.monitor(self.buffer, self.buffer_save_path)
 
         # writer
-        self.writer = SummaryWriter(log_dir=RL_options['runs_save_path'], comment="ForexRL")
+        self.writer = SummaryWriter(log_dir=self.runs_save_path, comment="ForexRL")
 
         # loss tracker
         self.loss_tracker = common.lossTracker(self.writer, group_losses=100)
@@ -114,7 +115,7 @@ class SimpleRL(BaseStrategy):
                 checkpoint = {
                     "state_dict": self.net.state_dict()
                 }
-                with open(os.path.join(self.RL_options['net_saved_path'], "checkpoint-{}.data".format(self.step_idx)), "wb") as f:
+                with open(os.path.join(self.net_saved_path, "checkpoint-{}.data".format(self.step_idx)), "wb") as f:
                     torch.save(checkpoint, f)
 
             # TODO: validation has something to changed

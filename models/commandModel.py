@@ -11,15 +11,15 @@ def check(input, trader):
         print("Please select the strategy list")
         return config.COMMAND_CHECKED
 
-    if input == '-addma':
+    elif input == '-addma':
         params = inputModel.ask_params(MovingAverage)
         trader.add_strategy(MovingAverage, params)
 
-    if input == '-addcoin':
+    elif input == '-addcoin':
         params = inputModel.ask_params(Cointegration)
         trader.add_strategy(Cointegration, params)
 
-    if input == '-addrl':
+    elif input == '-addrl':
         params = inputModel.ask_params(SimpleRL)
         trader.add_strategy(SimpleRL, params)
 

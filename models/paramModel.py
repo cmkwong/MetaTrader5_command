@@ -1,5 +1,20 @@
 import re
 
+from models import fileModel
+import config
+
+def read_default_param(strategy_name):
+    text = fileModel.read_text(config.PARAMS_PATH, config.PARAMS_FILENAME)
+    strategy_param_text = [t for t in text.split('~') if len(t) > 0 and t.find(strategy_name) >= 0][0].strip()
+    strategy_param_dict = {}
+    for param_text in strategy_param_text.split('\n')[1:]:
+        param_name, value = param_text.split(':')
+        strategy_param_dict[param_name.strip()] = value.strip()
+    return strategy_param_dict
+
+# def get_param_value(strategy_param_text, param_name):
+#     for param_text in strategy_param_text.split('\n')
+
 class SymbolList(object):
     @staticmethod
     def get_default_text():
@@ -66,6 +81,7 @@ class Tech_Dict(object):
     @staticmethod
     def __new__(cls, text:str):
         """
+        text: ma 5 10 25 50 100 150 200 250; bb (20,2,2,0) (20,3,3,0) (20,4,4,0) (40,2,2,0) (40,3,3,0) (40,4,4,0); std (5,1) (20,1) (50,1) (100,1) (150,1) (250,1); rsi 5 15 25 50 100 150 250; stocOsci (5,3,3,0,0) (14,3,3,0,0) (21,14,14,0,0); macd (12,26,9) (19,39,9)
         tech_params = {
             'ma': [5,10,25,50,100,150,200,250],
             'bb': [(20,2,2,0),(20,3,3,0),(20,4,4,0),(40,2,2,0),(40,3,3,0),(40,4,4,0)],
@@ -75,8 +91,8 @@ class Tech_Dict(object):
             'macd': [(12,26,9),(19,39,9)]
         }
         """
-        if len(text) == 0:
-            text = cls.get_default_text()
+        # if len(text) == 0:
+        #     text = cls.get_default_text()
         params = {}
         splited_text = cls.get_splited_text(text)
         raw_dic = cls.text_to_dic(splited_text)

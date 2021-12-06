@@ -8,10 +8,10 @@ from strategies.baseStrategy import BaseStrategy
 from models.paramModel import SymbolList, InputBoolean
 
 class Cointegration(BaseStrategy):
-    def __init__(self, dataLoader, *,
+    def __init__(self, dataLoader, strategy_id, *,
                 symbols:SymbolList, timeframe:str, local:InputBoolean, start:str, end:str, change_of_close:bool, threshold:float, z_score_mean_window:int, z_score_std_window:int, long_mode:InputBoolean,
-                percentage=0.8, debug_path='', debug_file='', debug=False):
-        super(Cointegration, self).__init__(symbols, timeframe, start, end, dataLoader, debug_path, debug_file, debug, local, percentage, long_mode)
+                percentage=0.8, debug=False):
+        super(Cointegration, self).__init__(strategy_id, symbols, timeframe, start, end, dataLoader, debug, local, percentage, long_mode)
 
         # training
         self.change_of_close = change_of_close # False: using close price; True: using change of close price
@@ -147,7 +147,7 @@ class Cointegration(BaseStrategy):
 
             # ------------ DEBUG -------------
             if self.debug:
-                self.get_debug(Prices, Graph_Data, coin_data, signal, accum_ret_df, accum_earning_df, train_test)
+                self.get_numeric_debug(Prices, Graph_Data, coin_data, signal, accum_ret_df, accum_earning_df, train_test)
 
         return plt_datas['train'], plt_datas['test']
 

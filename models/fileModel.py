@@ -20,6 +20,11 @@ def _get_names_and_usecols(ohlc):
            usecols.append(i+1)
     return names, usecols
 
+def read_text(file_path, file_name):
+    with open(os.path.join(file_path, file_name), 'r') as f:
+        txt = f.read()
+    return txt
+
 def read_MyCSV(symbol_path, file_name, data_time_difference_to_UTC, names, usecols):
     """
     the timezone is Eastern Standard Time (EST) time-zone WITHOUT Day Light Savings adjustments
@@ -145,7 +150,8 @@ def create_dir(main_path, dir_name, readme=None):
     Create directory with readme.txt
     """
     path = os.path.join(main_path, dir_name)
-    os.mkdir(path)
+    if not os.path.isfile(path):
+        os.mkdir(path)
     if readme:
         with open(os.path.join(path, 'readme.txt'), 'a') as f:
             f.write(readme)
