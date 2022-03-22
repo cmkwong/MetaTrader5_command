@@ -6,8 +6,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from strategies.baseStrategy import BaseStrategy
 from strategies.nnStrategy import NNStrategy
-from models.RLModel import actionsModel, agentModel, NNModel, experienceModel, environModel, validationModel, common
-from models.paramModel import SymbolList, Tech_Dict, InputBoolean
+from models.RLModel import NNModel, environModel, common
+
+from nn.rl import Agents, Actions, Experiences, Validations, Rewards, Losses
+from utils.paramType import SymbolList, Tech_Dict, InputBoolean
 
 class SimpleRL(BaseStrategy, NNStrategy):
     def __init__(self, dataLoader, strategy_id, *,
@@ -50,10 +52,10 @@ class SimpleRL(BaseStrategy, NNStrategy):
         self.net = NNModel.SimpleFFDQN(self.env.get_obs_len(), self.env.get_action_space_size())
 
         # create buffer
-        self.selector = actionsModel.EpsilonGreedyActionSelector(self.epsilon_start)
-        self.agent = agentModel.DQNAgent(self.net, self.selector)
-        self.exp_source = experienceModel.ExperienceSourceFirstLast(self.env, self.agent, self.gamma, steps_count=self.reward_steps)
-        self.buffer = experienceModel.ExperienceReplayBuffer(self.exp_source, self.replay_size)
+        self.selector = Actions.EpsilonGreedyActionSelector(self.epsilon_start)
+        self.agent = Agents.DQNAgent(self.net, self.selector)
+        self.exp_source = Experiences.ExperienceSourceFirstLast(self.env, self.agent, self.gamma, steps_count=self.reward_steps)
+        self.buffer = Experiences.ExperienceReplayBuffer(self.exp_source, self.replay_size)
 
         # create optimizer
         self.optimizer = optim.Adam(self.net.parameters(), lr=lr)
@@ -62,7 +64,7 @@ class SimpleRL(BaseStrategy, NNStrategy):
         self.net_processor = common.netPreprocessor(self.net, self.agent.target_model)
 
         # validator
-        self.validator = validationModel.validator(self.env_val, self.net, save_path=self.test_save_path, comission=0.1)
+        self.validator = Validations.StockValidator(self.env_val, self.net, save_path=self.test_save_path, comission=0.1)
 
         # create the monitor
         self.monitor = common.monitor(self.buffer, self.buffer_save_path)
@@ -71,10 +73,10 @@ class SimpleRL(BaseStrategy, NNStrategy):
         self.writer = SummaryWriter(log_dir=self.runs_save_path, comment="ForexRL")
 
         # loss tracker
-        self.loss_tracker = common.lossTracker(self.writer, group_losses=100)
+        self.loss_tracker = Losses.Tracker(self.writer, group_losses=100)
 
         # reward tracker
-        self.reward_tracker = common.RewardTracker(self.writer, np.inf, group_rewards=100)
+        self.reward_tracker = Rewards.Tracker(self.writer, np.inf, group_rewards=100)
 
     def load_net(self):
         with open(os.path.join(self.net_saved_path, self.net_file), "rb") as f:

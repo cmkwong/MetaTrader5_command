@@ -4,12 +4,6 @@ import os
 
 from models import returnModel
 
-def shift_list(lst, s):
-    s %= len(lst)
-    s *= -1
-    shifted_lst = lst[s:] + lst[:s]
-    return shifted_lst
-
 def get_accuracy(values, th=0.0):
     """
     :param values: listclose_price_with_last_tick
@@ -18,11 +12,6 @@ def get_accuracy(values, th=0.0):
     """
     accuracy = np.sum([c > th for c in values]) / len(values)
     return accuracy
-
-def append_dictValues_into_text(dic, txt=''):
-    values = list(dic.values())
-    txt += ','.join([str(value) for value in values]) + '\n'
-    return txt
 
 def dic_into_text(dic):
     text = ''

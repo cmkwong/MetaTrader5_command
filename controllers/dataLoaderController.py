@@ -4,7 +4,7 @@ import pandas as pd
 
 import config
 from models import exchgModel, fileModel, pointsModel, timeModel
-from utils import tools
+from selfUtils import tools
 
 class DataLoader: # created note 86a
     def __init__(self, mt5Controller, local_data_path='', deposit_currency='USD'):

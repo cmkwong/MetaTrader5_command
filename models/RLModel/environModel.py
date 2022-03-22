@@ -1,5 +1,5 @@
 from models import pointsModel, returnModel, techModel
-from utils import tools
+from selfUtils import tools
 
 import numpy as np
 import pandas as pd

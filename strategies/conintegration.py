@@ -3,9 +3,10 @@ import pandas as pd
 
 from models import signalModel
 from views import plotView
-from utils import maths
+from selfUtils import maths
 from strategies.baseStrategy import BaseStrategy
-from models.paramModel import SymbolList, InputBoolean
+
+from utils.paramType import SymbolList, InputBoolean
 
 class Cointegration(BaseStrategy):
     def __init__(self, dataLoader, strategy_id, *,

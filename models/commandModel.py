@@ -2,7 +2,8 @@ import config
 from strategies.movingAverage import MovingAverage
 from strategies.conintegration import Cointegration
 from strategies.RL import SimpleRL
-from models import inputModel
+
+from utils import paramModel
 
 def check(input, trader):
 
@@ -11,17 +12,25 @@ def check(input, trader):
         print("Please select the strategy list")
         return config.COMMAND_CHECKED
 
+    # add the strategies as candidates
     elif input == '-addma':
-        params = inputModel.ask_params(MovingAverage)
-        trader.add_strategy(MovingAverage, params)
+        params = paramModel.ask_params(MovingAverage, config.PARAMS_PATH, config.PARAMS_FILENAME)
+        trader.add_candidates(MovingAverage, params)
+        return config.COMMAND_CHECKED
 
     elif input == '-addcoin':
-        params = inputModel.ask_params(Cointegration)
-        trader.add_strategy(Cointegration, params)
+        params = paramModel.ask_params(Cointegration, config.PARAMS_PATH, config.PARAMS_FILENAME)
+        trader.add_candidates(Cointegration, params)
+        return config.COMMAND_CHECKED
 
     elif input == '-addrl':
-        params = inputModel.ask_params(SimpleRL)
-        trader.add_strategy(SimpleRL, params)
+        params = paramModel.ask_params(SimpleRL, config.PARAMS_PATH, config.PARAMS_FILENAME)
+        trader.add_candidates(SimpleRL, params)
+        return config.COMMAND_CHECKED
+
+    # train the candidates
+    elif input == '-train':
+        return config.COMMAND_CHECKED
 
     else:
         return input

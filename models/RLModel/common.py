@@ -7,82 +7,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 
-class RewardTracker:
-    def __init__(self, writer, stop_reward, group_rewards=1):
-        self.writer = writer
-        self.stop_reward = stop_reward
-        self.reward_buf = []
-        self.steps_buf = []
-        self.group_rewards = group_rewards
-
-    def __enter__(self):
-        self.ts = time.time()
-        self.ts_frame = 0
-        self.total_rewards = []
-        self.total_steps = []
-        return self
-
-    def __exit__(self, *args):
-        self.writer.close()
-
-    def reward(self, reward_steps, frame, epsilon=None):
-        reward, steps = reward_steps
-        self.reward_buf.append(reward)
-        self.steps_buf.append(steps)
-        if len(self.reward_buf) < self.group_rewards:
-            return False
-        reward = np.mean(self.reward_buf)
-        steps = np.mean(self.steps_buf)
-        self.reward_buf.clear()
-        self.steps_buf.clear()
-        self.total_rewards.append(reward)
-        self.total_steps.append(steps)
-        speed = (frame - self.ts_frame) / (time.time() - self.ts)
-        self.ts_frame = frame
-        self.ts = time.time()
-        mean_reward = np.mean(self.total_rewards[-100:])
-        mean_steps = np.mean(self.total_steps[-100:])
-        epsilon_str = "" if epsilon is None else ", eps %.2f" % epsilon
-        print("%d: done %d games, mean reward %.3f, mean steps %.2f, speed %.2f f/s%s" % (
-            frame, len(self.total_rewards)*self.group_rewards, mean_reward, mean_steps, speed, epsilon_str
-        ))
-        sys.stdout.flush()
-        if epsilon is not None:
-            self.writer.add_scalar("epsilon", epsilon, frame)
-        self.writer.add_scalar("speed", speed, frame)
-        self.writer.add_scalar("reward_100", mean_reward, frame)
-        self.writer.add_scalar("reward", reward, frame)
-        self.writer.add_scalar("steps_100", mean_steps, frame)
-        self.writer.add_scalar("steps", steps, frame)
-        if mean_reward > self.stop_reward:
-            print("Solved in %d frames!" % frame)
-            return True
-        return False
-
-class lossTracker:
-    def __init__(self, writer, group_losses=1):
-        self.writer = writer
-        self.loss_buf = []
-        self.total_loss = []
-        self.steps_buf = []
-        self.group_losses = group_losses
-        self.capacity = group_losses*10
-
-    def loss(self, loss, frame):
-        assert (isinstance(loss, np.float))
-        self.loss_buf.append(loss)
-        if len(self.loss_buf) < self.group_losses:
-            return False
-        mean_loss = np.mean(self.loss_buf)
-        self.loss_buf.clear()
-        self.total_loss.append(mean_loss)
-        movingAverage_loss = np.mean(self.total_loss[-100:])
-        if len(self.total_loss) > self.capacity:
-            self.total_loss = self.total_loss[1:]
-
-        self.writer.add_scalar("loss_100", movingAverage_loss, frame)
-        self.writer.add_scalar("loss", mean_loss, frame)
-
 def unpack_batch(batch):
     states, actions, rewards, dones, last_states = [], [], [], [], []
     for exp in batch:
@@ -96,31 +20,6 @@ def unpack_batch(batch):
             last_states.append(exp.last_state)
     return states, np.array(actions), np.array(rewards, dtype=np.float32), \
            np.array(dones, dtype=np.uint8), last_states
-
-def calc_loss(batch, agent, gamma, train_on_gpu):
-    if train_on_gpu:
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-
-    states, actions, rewards, dones, next_states = unpack_batch(batch)
-
-    states_v = states
-    next_states_v = next_states
-    actions_v = torch.tensor(actions, device=device)
-    rewards_v = torch.tensor(rewards, device=device)
-    if train_on_gpu:
-        done_mask = torch.cuda.BoolTensor(dones)
-    else:
-        done_mask = torch.BoolTensor(dones)
-
-    state_action_values = agent.get_Q_value(states_v).gather(1, actions_v).squeeze(-1)
-    next_state_actions = agent.get_Q_value(next_states_v).max(1)[1]
-    next_state_values = agent.get_Q_value(next_states_v, tgt=True).gather(1, next_state_actions.unsqueeze(-1)).squeeze(-1)
-    next_state_values[done_mask] = 0.0
-
-    expected_state_action_values = next_state_values.detach() * gamma + rewards_v
-    return nn.MSELoss()(state_action_values, expected_state_action_values)
 
 def find_stepidx(text, open_str, end_str):
     regex_open = re.compile(open_str)

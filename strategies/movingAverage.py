@@ -4,8 +4,9 @@ import pandas as pd
 from strategies.baseStrategy import BaseStrategy
 from models import signalModel, techModel
 from views import plotView, printout
-from utils import tools
-from models.paramModel import SymbolList, InputBoolean
+
+from utils import dicModel
+from utils.paramType import SymbolList, InputBoolean
 
 class MovingAverage(BaseStrategy):
     def __init__(self, dataLoader, strategy_id, *,
@@ -63,7 +64,7 @@ class MovingAverage(BaseStrategy):
                 stat = Graph_Data.stat['earning'] # that is dictionary
                 stat['limit_unit'], stat['slow'], stat['fast'] = self.limit_unit, slow_index, fast_index
 
-                if stat["total"] > 0: stat_csv_txt = tools.append_dictValues_into_text(stat, stat_csv_txt)
+                if stat["total"] > 0: stat_csv_txt = dicModel.append_dictValues_into_text(stat, stat_csv_txt)
 
                 # # print results
                 print("\nlimit unit: {}; slow index: {}; fast index: {}".format(self.limit_unit, slow_index, fast_index))

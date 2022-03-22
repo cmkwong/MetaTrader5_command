@@ -1,8 +1,10 @@
 from controllers.executeController import Executor
 from controllers.dataLoaderController import DataLoader
 from controllers.mt5Controller import Mt5Controller
-from models import commandModel, inputModel, timeModel, fileModel
-from utils import tools
+from models import commandModel, timeModel, fileModel
+from selfUtils import tools
+
+from utils import inputModel
 
 class Trader:
     def __init__(self, deposit_currency, timezone, local_data_path, docs_path):
@@ -15,7 +17,7 @@ class Trader:
 
         # prepare
         self.docs_path = docs_path
-        self.strategies = {}
+        self.candidates = {}
 
     def end(self):
         self.mt5Controller.disconnect_server()
@@ -25,13 +27,13 @@ class Trader:
         input = commandModel.check(input, self)
         return input
 
-    def add_strategy(self, strategyClass, params):
+    def add_candidates(self, strategyClass, params):
         # build the strategy file
         time_str = timeModel.get_current_time_string(with_seconds=True)
-        strategy_id = "{}_{}".format(time_str, strategyClass.__name__)
+        candidate_id = "{}_{}".format(time_str, strategyClass.__name__)
         text = "Strategy: {}\n{}".format(strategyClass.__name__, tools.dic_into_text(params))
-        fileModel.create_dir(self.docs_path, strategy_id, text)
+        fileModel.create_dir(self.docs_path, candidate_id, text)
         # create strategy class and add into Trader
-        self.strategies[strategy_id] = strategyClass(self.dataLoader, strategy_id, **params)
-        print("{} added".format(strategy_id))
+        self.candidates[candidate_id] = strategyClass(self.dataLoader, candidate_id, **params)
+        print("{} added".format(candidate_id))
 

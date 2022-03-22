@@ -1,11 +1,10 @@
 import pandas as pd
 import numpy as np
-import collections
 import os
 import seaborn as sns
 from matplotlib import pyplot as plt
 from models import timeModel
-from utils import tools, maths
+from selfUtils import maths
 
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
