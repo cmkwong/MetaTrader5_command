@@ -78,5 +78,9 @@ class BaseStrategy:
     # def get_plt_datas(self, **args):
     #     raise NotImplementedError("Please Implement this method")
     #
-    # def train(self):
-    #     raise NotImplementedError("Please Implement this method")
+
+    def train(self, *args):
+        raise NotImplementedError("Please Implement this method")
+
+    def run(self, *args):
+        raise NotImplementedError("Please Implement this method")
